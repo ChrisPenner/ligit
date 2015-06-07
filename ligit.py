@@ -65,13 +65,13 @@ def cd(path):
     finally:
         os.chdir(old_dir)
 
-def _error(*args):
+def _error(message):
     """Prints errors in red."""
-    print RED, ' '.join(args), RESET
+    print RED, message, RESET
 
-def _ok(*args):
+def _ok(message):
     """Prints messages in green."""
-    print GREEN, ' '.join(args), RESET
+    print GREEN, message, RESET
 
 def _clone(info):
     """Uses git to clone a repo into TEMP_DIR."""
@@ -79,6 +79,9 @@ def _clone(info):
     clone_dir = info['clone_dir']
     branch = info['branch']
     project = info['project']
+    if os.path.exists(clone_dir):
+        _error('Duplicate definition in manifest for %s' % project)
+        return ERROR
     status = call(['git', 'clone', url, clone_dir], stdout=OUT, stderr=OUT)
     if status != 0:
         _error('Failed to clone %s, moving on.' % url)
@@ -93,18 +96,19 @@ def _clone(info):
 
 def _move(src, dest):
     """Moves desired files from src to dest"""
-    if os.path.isfile(src):
+    print 'moving', src, 'to', dest
+    if not os.path.exists(src):
+        raise IOError("File %s doesn't exist!" % src)
+    if os.path.isfile(src) or os.path.islink(src):
+        # Make sure we have a trailing slash, only allow copying to dirs.
+        dest = os.path.join(dest, '')
         file_name = os.path.basename(src)
         dest_dir = os.path.dirname(dest)
         dest_file_name = os.path.join(dest_dir, file_name)
         if not os.path.isdir(dest_dir):
             os.makedirs(dest_dir)
-        if os.path.isfile(dest_file_name):
-            os.remove(dest_file_name)
         success = shutil.move(src, dest)
     else:
-        if os.path.isdir(dest):
-            shutil.rmtree(dest)
         success = shutil.copytree(src, dest, ignore=ignore_patterns('.git'))
     return success
 
@@ -128,7 +132,9 @@ def _parse_repo(line):
     user, project = user.strip(), project.strip()
     url = GIT_PREFIX + repo
     clone_dir = os.path.join(TEMP_DIR, project)
-    return {'user': user, 'project': project, 'url': url, 'repo': repo, 'clone_dir': clone_dir, 'branch': branch}
+    project_dir = os.path.join(LIB_DIR, project)
+    return {'user': user, 'project': project, 'url': url, 'repo': repo, 'clone_dir': clone_dir,
+            'project_dir': project_dir, 'branch': branch}
 
 
 def _split_file_into_chunks(f):
@@ -165,15 +171,35 @@ def _split_file_into_chunks(f):
         chunks.append(current_chunk)
     return chunks
 
+def _create_project_dir(info):
+    project_dir = info['project_dir']
+    os.makedirs(project_dir)
+    return
+
+def _remove_existing_project_dir(info):
+    project_dir = info['project_dir']
+    if os.path.exists(project_dir):
+        if os.path.isdir(project_dir):
+            shutil.rmtree(project_dir)
+        else:
+            os.remove(project_dir)
+
 
 def _process_chunk(chunk):
     project_info = _parse_repo(chunk[0])
+    project = project_info['project']
+    _ok('Cloning %s' % project)
     status = _clone(project_info)
+    _remove_existing_project_dir(project_info)
     if status == ERROR:
         return
+
+    # If only the header, copy all
     if len(chunk) == 1:
         _copy_all(project_info)
         return
+
+    _create_project_dir(project_info)
     # No longer need repo info
     chunk.pop(0)
     _run_commands(project_info, chunk)
@@ -192,7 +218,8 @@ def _run_commands(info, chunk):
         try:
             _move(src, dest)
         except Exception as e:
-            _error('copy failed in project %s' % project, e)
+            _error('Copy failed in project %s' % project)
+            _error(e)
     _ok('Finished %s' % project)
 
 def _copy_all(info):
@@ -213,5 +240,4 @@ def main():
 try:
     main()
 finally:
-    print TEMP_DIR
     call(['rm', '-rf', TEMP_DIR])
