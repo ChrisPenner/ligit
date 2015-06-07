@@ -65,48 +65,50 @@ def cd(path):
     finally:
         os.chdir(old_dir)
 
-def _error(message):
+def _error(*args):
     """Prints errors in red."""
-    print RED + message + RESET
+    print RED, ' '.join(args), RESET
 
-def _ok(message):
+def _ok(*args):
     """Prints messages in green."""
-    print GREEN + message + RESET
+    print GREEN, ' '.join(args), RESET
 
 def _clone(info):
     """Uses git to clone a repo into TEMP_DIR."""
     url = info['url']
     clone_dir = info['clone_dir']
     branch = info['branch']
+    project = info['project']
     status = call(['git', 'clone', url, clone_dir], stdout=OUT, stderr=OUT)
     if status != 0:
         _error('Failed to clone %s, moving on.' % url)
         return ERROR
-    else:
-        _ok('cloned %s' % (os.path.basename(url)))
     if branch:
         with cd(clone_dir):
             status = call(['git', 'checkout', branch], stdout=OUT, stderr=OUT)
         if status != 0:
-            _error("No branch/tag %s in project %s" % (branch, project))
+            _error("Error in project %s: No branch/tag %s found" % (project, branch))
             return ERROR
     return OK
 
 def _move(src, dest):
     """Moves desired files from src to dest"""
-    _ok('moving %s to %s' % (os.path.basename(src), dest))
     if os.path.isfile(src):
+        file_name = os.path.basename(src)
         dest_dir = os.path.dirname(dest)
+        dest_file_name = os.path.join(dest_dir, file_name)
         if not os.path.isdir(dest_dir):
             os.makedirs(dest_dir)
+        if os.path.isfile(dest_file_name):
+            os.remove(dest_file_name)
         success = shutil.move(src, dest)
     else:
         if os.path.isdir(dest):
-            shutil.rmtree(project_dest)
+            shutil.rmtree(dest)
         success = shutil.copytree(src, dest, ignore=ignore_patterns('.git'))
     return success
 
-def get_line_type(line):
+def _get_line_type(line):
     """Determine type of the current line"""
     if line.strip().startswith('#') or line.strip() == '':
         return COMMENT
@@ -128,37 +130,33 @@ def _parse_repo(line):
     clone_dir = os.path.join(TEMP_DIR, project)
     return {'user': user, 'project': project, 'url': url, 'repo': repo, 'clone_dir': clone_dir, 'branch': branch}
 
-    if clone_succeeded:
-        clone_all = True
-        project_dest = os.path.join(LIB_DIR, project)
-        if os.path.isdir(project_dest):
-            _error('Removing existing dir: %s' % project_dest)
-            shutil.rmtree(project_dest)
-
-
 
 def _split_file_into_chunks(f):
     """Produces a list where each element is a list of lines associated with a project,"""
     chunks = []
     current_chunk = []
     for line in f.xreadlines():
-        line_type = get_line_type(line)
+        line_type = _get_line_type(line)
+        line = line.strip()
         if line_type == COMMENT:
             # Skip comments
             continue
         elif line_type == REPO:
             # If the current chunk is empty, add the repo
-            if not current_chunk:
+            if len(current_chunk) == 0:
                 current_chunk.append(line)
+                continue
             # Otherwise start a new chunk
             else:
                 chunks.append(current_chunk)
-                current_chunk = []
+                current_chunk = [line]
+                continue
         else: # Line is command
             # If the current chunk is empty, something weird happened
-            if not current_chunk:
-                _error('Command found outside project block')
+            if len(current_chunk) == 0:
+                _error('Command found outside of a project block')
                 _error(line)
+                raise Exception('Command found outside of a project block')
             # Otherwise add command to chunk
             else:
                 current_chunk.append(line)
@@ -166,6 +164,7 @@ def _split_file_into_chunks(f):
     if current_chunk:
         chunks.append(current_chunk)
     return chunks
+
 
 def _process_chunk(chunk):
     project_info = _parse_repo(chunk[0])
@@ -175,9 +174,26 @@ def _process_chunk(chunk):
     if len(chunk) == 1:
         _copy_all(project_info)
         return
-    repo = project_info['repo']
+    # No longer need repo info
+    chunk.pop(0)
+    _run_commands(project_info, chunk)
 
-    clone_succeeded = _handle_repo(line, clone_all=clone_all)
+def _run_commands(info, chunk):
+    for line in chunk:
+        if '>' in line:
+            src, dest = line.split('>')
+            src, dest = src.strip(), dest.strip()
+        else:
+            src, dest = line.strip(), ''
+        clone_dir = info['clone_dir']
+        project = info['project']
+        src = os.path.join(clone_dir, src)
+        dest = os.path.join(LIB_DIR, project, dest)
+        try:
+            _move(src, dest)
+        except Exception as e:
+            _error('copy failed in project %s' % project, e)
+    _ok('Finished %s' % project)
 
 def _copy_all(info):
     src = info['clone_dir']
@@ -187,32 +203,15 @@ def _copy_all(info):
     if status == ERROR:
         _error('Failed to copy %s to %s' % (project, dest))
     else:
-        _ok('Copied %s' % project)
+        _ok('Finished %s' % project)
 
+def main():
+    chunks = _split_file_into_chunks(manifest)
+    for chunk in chunks:
+        _process_chunk(chunk)
 
-def _process_command(command):
-        if '>' in line:
-            src, dest = line.split('>')
-            src, dest = src.strip(), dest.strip()
-        else:
-            src, dest = line.strip(), ''
-        src = os.path.join(project_dir, src)
-        dest = os.path.join(LIB_DIR, project, dest)
-        _move(src, dest)
-
-if clone_all:
-    src = project_dir
-    dest = os.path.join(LIB_DIR, project)
-    _move(src, dest)
-
-failed = False
-project_dir = None
-clone_succeeded = False
-clone_all = False
-
-
-chunks = _split_file_into_chunks(manifest)
-for chunk in chunks:
-    _process_chunk(chunk)
-print TEMP_DIR
-call(['rm', '-rf', TEMP_DIR])
+try:
+    main()
+finally:
+    print TEMP_DIR
+    call(['rm', '-rf', TEMP_DIR])
