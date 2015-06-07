@@ -1,4 +1,4 @@
-# Ligit (le-jit)
+# Ligit (Lah-Jit)
 A quick, easy, and very portable manager for libraries hosted on git, works for any language and any project structure.
 
 ## Why?
@@ -8,13 +8,14 @@ to package them up nicely and it's a lot of work. Not to mention you need a diff
 platform or language (pip, npm, gem etc.).
 
 Ligit solves these problems by making the package the source code itself, this means it's:
-    - *Always up to date*
-    - *Always accessible* (git is the only dependency for ligit)
-    - *Always configurable* (you can specify to keep only the folders/files you actually need)
-    - *Easy to update* (with a single command you can update ALL your libs, regardless of what they are)
+
+* **Always up to date**
+* **Always accessible** (git is the only dependency for ligit)
+* **Always configurable** (you can specify to keep only the folders/files you actually need)
+* **Easy to update** (with a single command you can update ALL your libs, regardless of what they are)
 
 The basic idea is to clone the repo, then pull only the folders/files you need into your project.
-You can specify exactly which files you need and how you'd like them organized by using a dead-simple *manifest file*.
+You can specify exactly which files you need and how you'd like them organized by using a dead-simple **manifest file**.
 
 ## Manifest files
 Define a manifest like this:
@@ -37,15 +38,17 @@ ChrisPenner/BoxKite#nightly-builds
 ```
 
 This manifest file results in a structure like this:
-> lib
-> ├── vimprove
-> │   └── tips
-> ├── dotfiles
-> │   ├── extras
-> │   │   └── functions
-> │   └── vimrc
-> └── BoxKite
->     └── boxkite-source-here
+```
+ lib
+ ├── vimprove
+ │   └── tips
+ ├── dotfiles
+ │   ├── extras
+ │   │   └── functions
+ │   └── vimrc
+ └── BoxKite
+     └── boxkite-source-here
+```
 
 Any files or directories that are not specified are not be added, so make sure you grab everything you need.
 
