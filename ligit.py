@@ -4,6 +4,7 @@ import sys
 import os
 from subprocess import call
 from tempfile import mkdtemp
+import shutil
 
 GIT_PREFIX = 'https://www.github.com/'
 BLACK   = '\033[30m'
@@ -57,7 +58,14 @@ def clone(user, project, tempdir, branch=None):
 
 def move(src, dest):
     green('moving %s to %s' % (src, dest))
-    return
+    if os.path.isfile(src):
+        dest_dir = os.path.dirname(dest)
+        if not os.path.isdir(dest_dir):
+            os.makedirs(dest_dir)
+        success = shutil.move(src, dest) == 0
+    else:
+        success = shutil.copytree(src, dest) == 0
+    return success
 
 def get_line_type(line):
     if line.strip().startswith('#') or line.strip() == '':
@@ -81,7 +89,6 @@ manifest_file = os.path.join(manifest_dir, file_path)
 os.chdir(manifest_dir)
 print "Using %s from %s" % (file_path, manifest_dir)
 
-
 tempdir = mkdtemp(prefix='ligit')
 with open(manifest_file) as f:
     failed = False
@@ -103,16 +110,14 @@ with open(manifest_file) as f:
             clone_succeeded, project_dir = clone(user=user, project=project,
                                               tempdir=tempdir, branch=branch)
 
-        if line_type == COMMAND:
-            if not clone_succeeded:
-                continue
+        if line_type == COMMAND and clone_succeeded:
             if '>' in line:
                 src, dest = line.split('>')
                 src, dest = src.strip(), dest.strip()
             else:
-                src, dest = line, ''
-            src = os.path.join(tempdir, src)
-            dest = os.path.join(project_dir, dest)
+                src, dest = line.strip(), ''
+            src = os.path.join(project_dir, src)
+            dest = os.path.join(manifest_dir, project, dest)
             move(src, dest)
 
 print tempdir
