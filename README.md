@@ -20,34 +20,62 @@ You can specify exactly which files you need and how you'd like them organized b
 ## Manifest files
 Define a manifest like this:
 ```bash
-# Inside 'manifest' file
+# Sample manifest file
 
 # Specify github username and repo for each project 'username/project'
 # The indented block contains instructions for that project. Here we're copying only a few files from that repo,
 # and we're rearranging the structure of it a bit.
+# If a file/folder is listed without a destination it's copied to the project folder.
 ChrisPenner/dotfiles
-    vimrc > .
+    zshrc
+    vimrc
+    profile
     functions > extras/
 
 # You can also specify a specific tag, version, branch, or commit to checkout using the '#' symbol
-ChrisPenner/vimprove#v0.3
-    tips > .
+# File globbing works too!
+ChrisPenner/BoxKite#nightly-builds
+    *.py
+    content
+    css > static/
+    js > static/
+    templates/* > static/html/
 
 # Using only the header will simply include the entire project in a folder named after the repo
-ChrisPenner/BoxKite#nightly-builds
+ChrisPenner/vimprove#v0.3
 ```
 
-This manifest file results in a structure like this:
+This manifest file results in a structure something like this (simplified):
 ```
- lib
- ├── vimprove
- │   └── tips
- ├── dotfiles
- │   ├── extras
- │   │   └── functions
- │   └── vimrc
- └── BoxKite
-     └── boxkite-source-here
+lib
+├── vimprove
+│   ├── vimtips.sh
+│   ├── tips
+│   └── data
+├── dotfiles
+│   ├── extras
+│   │   └── functions
+│   ├── zshrc
+│   ├── vimrc
+│   └── profile
+└── BoxKite
+    ├── static
+    │   ├── js
+    │   ├── html
+    │   │   ├── template2.html
+    │   │   └── template1.html
+    │   └── css
+    ├── content
+    │   ├── posts
+    │   │   ├── post3.txt
+    │   │   ├── post2.txt
+    │   │   └── post1.txt
+    │   └── images
+    │       ├── image2.png
+    │       └── image1.png
+    ├── routes.py
+    ├── main.py
+    └── config.py
 ```
 
 Any files or directories that are not specified are not be added, so make sure you grab everything you need.
