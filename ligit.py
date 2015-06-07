@@ -21,7 +21,7 @@ def init():
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
                         help='Print out all error messages and git logs')
     parser.add_argument('--version', action='version', version=VERSION)
-    return parser.parse_args
+    return parser.parse_args()
 ARGS = init()
 VERBOSE = ARGS.verbose
 
