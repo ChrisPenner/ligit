@@ -23,7 +23,10 @@ Define a manifest like this:
 # Sample manifest file
 
 # Specify github username and repo for each project 'username/project'
-# The indented block contains instructions for that project. Here we're copying only a few files from that repo,
+# Using only the username/repo will simply include the entire project in a folder named after the repo
+ChrisPenner/vimprove#v0.3
+
+# An indented block contains instructions for that project. Here we're copying only a few files from that repo
 # and we're rearranging the structure of it a bit.
 # If a file/folder is listed without a destination it's copied to the project folder.
 ChrisPenner/dotfiles
@@ -34,15 +37,12 @@ ChrisPenner/dotfiles
 
 # You can also specify a specific tag, version, branch, or commit to checkout using the '#' symbol
 # File globbing works too!
-ChrisPenner/BoxKite#nightly-builds
+ChrisPenner/BoxKite#nightly-build
     *.py
     content
     css > static/
     js > static/
     templates/* > static/html/
-
-# Using only the header will simply include the entire project in a folder named after the repo
-ChrisPenner/vimprove#v0.3
 ```
 
 This manifest file results in a structure something like this (simplified):
