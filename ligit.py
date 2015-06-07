@@ -8,6 +8,7 @@ import shutil
 from shutil import ignore_patterns
 from argparse import ArgumentParser, FileType
 from contextlib import contextmanager
+from glob import glob
 
 VERSION = 'v0.0.1'
 
@@ -84,7 +85,7 @@ def _clone(info):
         return ERROR
     status = call(['git', 'clone', url, clone_dir], stdout=OUT, stderr=OUT)
     if status != 0:
-        _error('Failed to clone %s, moving on.' % url)
+        _error('Failed to clone %s' % url)
         return ERROR
     if branch:
         with cd(clone_dir):
@@ -96,21 +97,33 @@ def _clone(info):
 
 def _move(src, dest):
     """Moves desired files from src to dest"""
-    print 'moving', src, 'to', dest
-    if not os.path.exists(src):
-        raise IOError("File %s doesn't exist!" % src)
-    if os.path.isfile(src) or os.path.islink(src):
-        # Make sure we have a trailing slash, only allow copying to dirs.
-        dest = os.path.join(dest, '')
-        file_name = os.path.basename(src)
-        dest_dir = os.path.dirname(dest)
-        dest_file_name = os.path.join(dest_dir, file_name)
-        if not os.path.isdir(dest_dir):
-            os.makedirs(dest_dir)
-        success = shutil.move(src, dest)
-    else:
-        success = shutil.copytree(src, dest, ignore=ignore_patterns('.git'))
-    return success
+    sources = glob(src)
+    if not sources:
+        _error("No files matching %s exist!" % os.path.basename(src))
+        return
+    for src in sources:
+        if os.path.isfile(src) or os.path.islink(src):
+            # Make sure we have a trailing slash, only allow copying to dirs.
+            dest = os.path.join(dest, '')
+            file_name = os.path.basename(src)
+            dest_dir = os.path.dirname(dest)
+            dest_file_name = os.path.join(dest_dir, file_name)
+            if not os.path.isdir(dest_dir):
+                os.makedirs(dest_dir)
+            try:
+                shutil.move(src, dest)
+            except Exception as e:
+                _error('Failed to copy %s' % os.path.basename(src))
+                print e
+                continue
+        else:
+            dest_dir = os.path.join(dest, os.path.basename(src))
+            try:
+                shutil.copytree(src, dest_dir, ignore=ignore_patterns('.git'))
+            except Exception as e:
+                _error('Failed to copy %s' % os.path.basename(src))
+                print e
+                continue
 
 def _get_line_type(line):
     """Determine type of the current line"""
@@ -215,22 +228,17 @@ def _run_commands(info, chunk):
         project = info['project']
         src = os.path.join(clone_dir, src)
         dest = os.path.join(LIB_DIR, project, dest)
-        try:
-            _move(src, dest)
-        except Exception as e:
-            _error('Copy failed in project %s' % project)
-            _error(e)
-    _ok('Finished %s' % project)
+        # try:
+        _move(src, dest)
+        # except Exception as e:
+        # _error('Copy failed in project %s' % project)
+        # _error(e)
 
 def _copy_all(info):
     src = info['clone_dir']
     project = info['project']
     dest = os.path.join(LIB_DIR, project)
-    status = _move(src, dest)
-    if status == ERROR:
-        _error('Failed to copy %s to %s' % (project, dest))
-    else:
-        _ok('Finished %s' % project)
+    _move(src, dest)
 
 def main():
     chunks = _split_file_into_chunks(manifest)
