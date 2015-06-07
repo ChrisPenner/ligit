@@ -12,19 +12,22 @@ from glob import glob
 
 VERSION = 'v0.0.1'
 
-parser = ArgumentParser(description="Minimalist Git library management.")
-parser.add_argument('manifest', help='Path to manifest file containing instructions.',
-                    type=FileType('r'), default=None, nargs='?')
+def init():
+    """ Handle arguments and initialize. """
+    parser = ArgumentParser(description="Minimalist Git library management.")
+    parser.add_argument('manifest', help='Path to manifest file containing instructions.',
+                        type=FileType('r'), default=None, nargs='?')
 
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
-                    help='Print out all error messages and git logs')
-parser.add_argument('--version', action='version', version=VERSION)
-args =  parser.parse_args()
-VERBOSE = args.verbose
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
+                        help='Print out all error messages and git logs')
+    parser.add_argument('--version', action='version', version=VERSION)
+    return parser.parse_args
+ARGS = init()
+VERBOSE = ARGS.verbose
 
 try:
-    manifest = args.manifest or open('manifest', 'r')
-except IOError as e:
+    MANIFEST = ARGS.manifest or open('manifest', 'r')
+except IOError:
     print 'No manifest file found in current directory.'
     print 'Please specify a file or move to a directory containing one.'
     sys.exit(1)
@@ -57,8 +60,10 @@ TEMP_DIR = mkdtemp(prefix='ligit')
 ERROR = 1
 OK = 0
 
+# pylint: disable=invalid-name
 @contextmanager
 def cd(path):
+    """ cd with context manager """
     old_dir = os.getcwd()
     os.chdir(path)
     try:
@@ -105,24 +110,22 @@ def _move(src, dest):
         if os.path.isfile(src) or os.path.islink(src):
             # Make sure we have a trailing slash, only allow copying to dirs.
             dest = os.path.join(dest, '')
-            file_name = os.path.basename(src)
             dest_dir = os.path.dirname(dest)
-            dest_file_name = os.path.join(dest_dir, file_name)
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
             try:
                 shutil.move(src, dest)
-            except Exception as e:
+            except IOError as error:
                 _error('Failed to copy %s' % os.path.basename(src))
-                print e
+                print error
                 continue
         else:
             dest_dir = os.path.join(dest, os.path.basename(src))
             try:
                 shutil.copytree(src, dest_dir, ignore=ignore_patterns('.git'))
-            except Exception as e:
+            except IOError as error:
                 _error('Failed to copy %s' % os.path.basename(src))
-                print e
+                print error
                 continue
 
 def _get_line_type(line):
@@ -135,6 +138,7 @@ def _get_line_type(line):
         return REPO
 
 def _parse_repo(line):
+    """ Split repo-line into its constituant parts. """
     if '#' in line:
         repo, branch = line.split('#')
         repo, branch = repo.strip(), branch.strip()
@@ -185,11 +189,13 @@ def _split_file_into_chunks(f):
     return chunks
 
 def _create_project_dir(info):
+    """ Create project directory """
     project_dir = info['project_dir']
     os.makedirs(project_dir)
     return
 
 def _remove_existing_project_dir(info):
+    """ Remove existing project directory """
     project_dir = info['project_dir']
     if os.path.exists(project_dir):
         if os.path.isdir(project_dir):
@@ -199,6 +205,7 @@ def _remove_existing_project_dir(info):
 
 
 def _process_chunk(chunk):
+    """ Process all computation for a chunk. """
     project_info = _parse_repo(chunk[0])
     project = project_info['project']
     _ok('Cloning %s' % project)
@@ -218,6 +225,7 @@ def _process_chunk(chunk):
     _run_commands(project_info, chunk)
 
 def _run_commands(info, chunk):
+    """ Run all commands in a chunk """
     for line in chunk:
         if '>' in line:
             src, dest = line.split('>')
@@ -235,13 +243,14 @@ def _run_commands(info, chunk):
         # _error(e)
 
 def _copy_all(info):
+    """ Copy entire repo to lib folder. """
     src = info['clone_dir']
-    project = info['project']
-    dest = os.path.join(LIB_DIR, project)
+    dest = LIB_DIR
     _move(src, dest)
 
 def main():
-    chunks = _split_file_into_chunks(manifest)
+    """ Entry point for execution. """
+    chunks = _split_file_into_chunks(MANIFEST)
     for chunk in chunks:
         _process_chunk(chunk)
 
